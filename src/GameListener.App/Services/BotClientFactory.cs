@@ -30,13 +30,12 @@ public sealed class BotClientFactory
             Token = settings.Token,
             TokenType = TokenType.Bot,
             LoggerFactory = _loggerFactory,
-            Intents = DiscordIntents.AllUnprivileged | DiscordIntents.MessageContents | DiscordIntents.GuildVoiceStates
+            Intents = DiscordIntents.All
         });
 
         discord.UseVoiceNext(new VoiceNextConfiguration
         {
-            EnableIncoming = true,
-            VoiceApplication = VoiceApplication.Music
+            EnableIncoming = true
         });
 
         return discord;

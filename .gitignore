@@ -17,3 +17,4 @@ obj/
 .vscode/
 # Output
 sessions/
+/src/GameListener.App/appsettings.Development.json

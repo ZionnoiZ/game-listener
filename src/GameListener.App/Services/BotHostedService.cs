@@ -100,10 +100,10 @@ public sealed class BotHostedService : IHostedService
 
         try
         {
-            await _recordingManager.StartRecordingAsync(channel, e.Author.Username);
-            await e.Message.CreateReactionAsync(DiscordEmoji.FromName(e.Client, ":red_circle:"));
+            await _recordingManager.StartRecordingAsync(_client, channel, e.Author.Username);
+            await e.Message.CreateReactionAsync(DiscordEmoji.FromName(_client, ":red_circle:"));
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
             _logger.LogWarning(ex, "Unable to start recording");
             await e.Message.RespondAsync(ex.Message);

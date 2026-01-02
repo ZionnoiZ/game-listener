@@ -26,7 +26,7 @@ public sealed class RecordingManager
     public ulong? ActiveChannelId => _session?.ChannelId;
     public DiscordChannel? ActiveChannel => _session?.Channel;
 
-    public async Task StartRecordingAsync(DiscordChannel channel, string requestedBy)
+    public async Task StartRecordingAsync(DiscordClient client, DiscordChannel channel, string requestedBy)
     {
         await _gate.WaitAsync();
         try
@@ -36,7 +36,6 @@ public sealed class RecordingManager
                 throw new InvalidOperationException("Recording is already active.");
             }
 
-            var client = channel.Discord;
             var voiceNext = client.GetVoiceNext();
             if (voiceNext is null)
             {
