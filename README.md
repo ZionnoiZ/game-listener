@@ -1,9 +1,9 @@
 # game-listener
 
-A .NET 8 console application that connects a Discord bot to a configurable voice channel, records incoming audio on demand, and stores session data as text files with participant and timing metadata.
+A .NET 8 console application that connects a Discord bot to voice channels, records incoming audio on demand, and stores session data as text files with participant and timing metadata.
 
 ## Features
-- Join a specific voice channel (configurable via `appsettings.json` or environment variables).
+- Join the same voice channel as the user who requested recording.
 - Start recording with the `!record` command; stop with `!stop` or automatically when the channel becomes empty.
 - Capture incoming voice packets (multi-language friendly) and persist them immediately to per-session JSONL files that include who spoke and when.
 - Structured design that can be extended with additional enrichment (e.g., speech-to-text) without changing the core bot loop.
@@ -25,8 +25,6 @@ Populate `src/GameListener.App/appsettings.json` or environment variables:
 {
   "Discord": {
     "Token": "YOUR_DISCORD_BOT_TOKEN",
-    "CommandChannelId": "123456789012345678",
-    "VoiceChannelId": "123456789012345678",
     "CommandPrefix": "!",
     "OutputDirectory": "sessions",
     "GracePeriodAfterEmpty": "00:00:15"
@@ -35,8 +33,6 @@ Populate `src/GameListener.App/appsettings.json` or environment variables:
 ```
 
 Key notes:
-- `VoiceChannelId` lets you pin the listening channel; omit it to have the bot join the command issuer's current voice channel.
-- `CommandChannelId` scopes `!record`/`!stop` to a specific text channel; omit to allow any.
 - `OutputDirectory` is created automatically if missing; each session writes a JSON lines (`.jsonl`) file containing voice metadata and base64-encoded PCM payloads.
 
 Environment variables can override configuration using the `Discord__*` naming pattern, for example `Discord__Token`.
