@@ -1,5 +1,7 @@
+using System;
 using DSharpPlus;
 using DSharpPlus.Entities;
+using DSharpPlus.CommandsNext;
 using GameListener.App.Options;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,21 +12,24 @@ namespace GameListener.App.Services;
 public sealed class BotHostedService : IHostedService
 {
     private readonly BotClientFactory _clientFactory;
-    private readonly RecordingManager _recordingManager;
     private readonly ILogger<BotHostedService> _logger;
     private readonly DiscordOptions _options;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly RecordingManager _recordingManager;
     private DiscordClient? _client;
 
     public BotHostedService(
         BotClientFactory clientFactory,
         RecordingManager recordingManager,
         ILogger<BotHostedService> logger,
-        IOptions<DiscordOptions> options)
+        IOptions<DiscordOptions> options,
+        IServiceProvider serviceProvider)
     {
         _clientFactory = clientFactory;
         _recordingManager = recordingManager;
         _logger = logger;
         _options = options.Value;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -32,8 +37,14 @@ public sealed class BotHostedService : IHostedService
         _client = _clientFactory.Create();
 
         _client.Ready += OnReady;
-        _client.MessageCreated += OnMessageCreated;
         _client.VoiceStateUpdated += OnVoiceStateUpdated;
+
+        var commands = _client.UseCommandsNext(new CommandsNextConfiguration
+        {
+            StringPrefixes = new[] { _options.CommandPrefix },
+            Services = _serviceProvider
+        });
+        commands.RegisterCommands<RecordingCommands>();
 
         await _client.ConnectAsync();
         _logger.LogInformation("Discord client connected.");
@@ -55,69 +66,6 @@ public sealed class BotHostedService : IHostedService
     {
         _logger.LogInformation("Bot connected as {Username}", sender.CurrentUser.Username);
         return Task.CompletedTask;
-    }
-
-    private async Task OnMessageCreated(DiscordClient sender, DSharpPlus.EventArgs.MessageCreateEventArgs e)
-    {
-        if (e.Author.IsBot)
-        {
-            return;
-        }
-
-        if (!e.Message.Content.StartsWith(_options.CommandPrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        var content = e.Message.Content[_options.CommandPrefix.Length..].Trim();
-        var lower = content.ToLowerInvariant();
-
-        switch (lower)
-        {
-            case "record":
-                await HandleStartCommandAsync(e).ConfigureAwait(false);
-                break;
-            case "stop":
-                await _recordingManager.StopRecordingAsync("stop command", CancellationToken.None).ConfigureAwait(false);
-                await e.Message.CreateReactionAsync(DiscordEmoji.FromName(sender, ":white_check_mark:"));
-                break;
-        }
-    }
-
-    private async Task HandleStartCommandAsync(DSharpPlus.EventArgs.MessageCreateEventArgs e)
-    {
-        var channel = await ResolveVoiceChannelAsync(e.Author as DiscordMember);
-        if (channel is null)
-        {
-            await e.Message.RespondAsync("I could not find a voice channel to join. Join a voice channel before calling !record.");
-            return;
-        }
-
-        try
-        {
-            await _recordingManager.StartRecordingAsync(_client, channel, e.Author.Username);
-            await e.Message.CreateReactionAsync(DiscordEmoji.FromName(_client, ":red_circle:"));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Unable to start recording");
-            await e.Message.RespondAsync(ex.Message);
-        }
-    }
-
-    private async Task<DiscordChannel?> ResolveVoiceChannelAsync(DiscordMember? caller)
-    {
-        if (_client is null)
-        {
-            return null;
-        }
-
-        if (caller is null)
-        {
-            return null;
-        }
-
-        return caller.VoiceState?.Channel;
     }
 
     private async Task OnVoiceStateUpdated(DiscordClient sender, DSharpPlus.EventArgs.VoiceStateUpdateEventArgs e)

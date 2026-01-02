@@ -30,7 +30,7 @@ public sealed class BotClientFactory
             Token = settings.Token,
             TokenType = TokenType.Bot,
             LoggerFactory = _loggerFactory,
-            Intents = DiscordIntents.All
+            Intents = DiscordIntents.All | DiscordIntents.MessageContents
         });
 
         discord.UseVoiceNext(new VoiceNextConfiguration
