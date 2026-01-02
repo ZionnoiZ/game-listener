@@ -15,6 +15,7 @@ public sealed class RecordingManager
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private RecordingSession? _session;
+    private DiscordChannel? _pendingChannel;
 
     public RecordingManager(ILogger<RecordingManager> logger, IOptions<DiscordOptions> options)
     {
@@ -22,16 +23,16 @@ public sealed class RecordingManager
         _options = options;
     }
 
-    public bool IsRecording => _session is not null;
-    public ulong? ActiveChannelId => _session?.ChannelId;
-    public DiscordChannel? ActiveChannel => _session?.Channel;
+    public bool IsRecording => _session is not null || _pendingChannel is not null;
+    public ulong? ActiveChannelId => _session?.ChannelId ?? _pendingChannel?.Id;
+    public DiscordChannel? ActiveChannel => _session?.Channel ?? _pendingChannel;
 
     public async Task StartRecordingAsync(DiscordClient client, DiscordChannel channel, string requestedBy)
     {
         await _gate.WaitAsync();
         try
         {
-            if (_session is not null)
+            if (_session is not null || _pendingChannel is not null)
             {
                 throw new InvalidOperationException("Recording is already active.");
             }
@@ -42,16 +43,40 @@ public sealed class RecordingManager
                 throw new InvalidOperationException("VoiceNext is not configured on the Discord client.");
             }
 
+            _pendingChannel = channel;
             _logger.LogInformation("Connecting to voice channel {Channel}", channel.Name);
-            var connection = await voiceNext.ConnectAsync(channel);
+            var connectTask = voiceNext.ConnectAsync(channel);
+            var completed = await Task.WhenAny(connectTask, Task.Delay(TimeSpan.FromSeconds(15)));
+            if (completed != connectTask)
+            {
+                throw new TimeoutException($"Timed out connecting to voice channel {channel.Name}.");
+            }
+
+            var connection = await connectTask;
 
             var outputPath = EnsureOutputDirectory();
             var session = new RecordingSession(connection, channel, outputPath, requestedBy, _logger, _options.Value);
-            await session.InitializeAsync();
             _session = session;
+            _pendingChannel = null;
+
+            try
+            {
+                await session.InitializeAsync();
+            }
+            catch
+            {
+                _session = null;
+                await session.DisposeAsync();
+                _pendingChannel = null;
+                throw;
+            }
         }
         finally
         {
+            if (_session is null)
+            {
+                _pendingChannel = null;
+            }
             _gate.Release();
         }
     }
