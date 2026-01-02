@@ -64,11 +64,6 @@ public sealed class BotHostedService : IHostedService
             return;
         }
 
-        if (_options.CommandChannelId.HasValue && e.Channel.Id != _options.CommandChannelId.Value)
-        {
-            return;
-        }
-
         if (!e.Message.Content.StartsWith(_options.CommandPrefix, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -94,7 +89,7 @@ public sealed class BotHostedService : IHostedService
         var channel = await ResolveVoiceChannelAsync(e.Author as DiscordMember);
         if (channel is null)
         {
-            await e.Message.RespondAsync("I could not find a voice channel to join. Set Discord:VoiceChannelId or join a voice channel before calling !record.");
+            await e.Message.RespondAsync("I could not find a voice channel to join. Join a voice channel before calling !record.");
             return;
         }
 
@@ -115,11 +110,6 @@ public sealed class BotHostedService : IHostedService
         if (_client is null)
         {
             return null;
-        }
-
-        if (_options.VoiceChannelId.HasValue)
-        {
-            return await _client.GetChannelAsync(_options.VoiceChannelId.Value);
         }
 
         if (caller is null)

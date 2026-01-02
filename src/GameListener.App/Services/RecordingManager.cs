@@ -47,8 +47,18 @@ public sealed class RecordingManager
 
             var outputPath = EnsureOutputDirectory();
             var session = new RecordingSession(connection, channel, outputPath, requestedBy, _logger, _options.Value);
-            await session.InitializeAsync();
             _session = session;
+
+            try
+            {
+                await session.InitializeAsync();
+            }
+            catch
+            {
+                _session = null;
+                await session.DisposeAsync();
+                throw;
+            }
         }
         finally
         {
