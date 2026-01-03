@@ -166,7 +166,7 @@ public sealed class RecordingManager
         public ulong ChannelId { get; }
         public string ChannelName { get; }
 
-        public RecordingSession(GatewayClient client, VoiceClient voiceClient, Channel channel, ulong guildId, ulong channelId, string directory, string requestedBy, ILogger logger, DiscordOptions options)
+        public RecordingSession(GatewayClient client, VoiceClient voiceClient, NetCord.Channel channel, ulong guildId, ulong channelId, string directory, string requestedBy, ILogger logger, DiscordOptions options)
         {
             _client = client;
             _voiceClient = voiceClient;
@@ -265,11 +265,11 @@ public sealed class RecordingManager
         {
             _filePath = filePath;
             _logger = logger;
-            _writer = new StreamWriter(File.Open(filePath, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
+            _writer = new StreamWriter(File.Open(filePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read))
             {
                 AutoFlush = true
             };
-            _writeChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions
+            _writeChannel = System.Threading.Channels.Channel.CreateUnbounded<string>(new UnboundedChannelOptions
             {
                 SingleReader = true,
                 SingleWriter = false
