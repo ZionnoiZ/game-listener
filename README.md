@@ -13,8 +13,8 @@ A .NET 8 console application that connects a Discord bot to voice channels, reco
 - `src/GameListener.App` – console application entry point and services.
   - `Program.cs` – host setup and dependency injection registration.
   - `Options/DiscordOptions.cs` – configurable Discord and output settings.
-  - `Services/BotClientFactory.cs` – Discord client creation with VoiceNext enabled.
-  - `Services/BotHostedService.cs` – lifecycle management and command handling.
+  - `Commands/RecordingModule.cs` – NetCord text commands for recording control.
+  - `Services/RecordingCleanupService.cs` – lifecycle cleanup to stop active sessions on shutdown.
   - `Services/RecordingManager.cs` – voice connection, session handling, and JSONL persistence.
   - `appsettings.json` – sample configuration values.
 

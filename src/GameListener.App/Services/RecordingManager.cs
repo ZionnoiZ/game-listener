@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 using GameListener.App.Options;
 using NetCord;
@@ -9,23 +10,27 @@ namespace GameListener.App.Services;
 
 public sealed class RecordingManager
 {
+    private readonly GatewayClient _client;
     private readonly ILogger<RecordingManager> _logger;
     private readonly IOptions<DiscordOptions> _options;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private RecordingSession? _session;
 
-    public RecordingManager(ILogger<RecordingManager> logger, IOptions<DiscordOptions> options)
+    public RecordingManager(GatewayClient client, ILogger<RecordingManager> logger, IOptions<DiscordOptions> options)
     {
+        _client = client;
         _logger = logger;
         _options = options;
+
+        _client.VoiceStateUpdate += OnVoiceStateUpdateAsync;
     }
 
     public bool IsRecording => _session is not null;
     public ulong? ActiveChannelId => _session?.ChannelId;
     public ulong? ActiveGuildId => _session?.GuildId;
 
-    public async Task StartRecordingAsync(GatewayClient client, ulong guildId, ulong channelId, string requestedBy)
+    public async Task StartRecordingAsync(ulong guildId, ulong channelId, string requestedBy)
     {
         await _gate.WaitAsync();
         try
@@ -39,14 +44,14 @@ public sealed class RecordingManager
 
             var voiceClientType = Type.GetType("NetCord.Gateway.Voice.VoiceClient, NetCord.Gateway.Voice")
                 ?? throw new InvalidOperationException("Voice client type not found. Ensure NetCord.Gateway.Voice is referenced.");
-            dynamic voiceClient = Activator.CreateInstance(voiceClientType, client)
+            dynamic voiceClient = Activator.CreateInstance(voiceClientType, _client)
                 ?? throw new InvalidOperationException("Failed to create voice client.");
 
             dynamic connection = await voiceClient.ConnectAsync(guildId, channelId);
 
             var outputPath = EnsureOutputDirectory();
-            var channel = await client.Rest.GetChannelAsync(channelId);
-            var session = new RecordingSession(client, connection, channel, guildId, channelId, outputPath, requestedBy, _logger, _options.Value);
+            var channel = await _client.Rest.GetChannelAsync(channelId);
+            var session = new RecordingSession(_client, connection, channel, guildId, channelId, outputPath, requestedBy, _logger, _options.Value);
             _session = session;
 
             try
@@ -86,16 +91,37 @@ public sealed class RecordingManager
         }
     }
 
-    public async Task<bool> HasActiveMembersAsync(GatewayClient client)
+    public async Task<bool> HasActiveMembersAsync()
     {
         if (_session is null)
         {
             return false;
         }
 
-        var guild = await client.Rest.GetGuildAsync(_session.GuildId);
-        var states = guild?.VoiceStates?.Where(vs => vs.ChannelId == _session.ChannelId && vs.UserId != client.User.Id);
+        var guild = await _client.Rest.GetGuildAsync(_session.GuildId);
+        var states = guild?.VoiceStates?.Where(vs => vs.ChannelId == _session.ChannelId && vs.UserId != _client.User.Id);
         return states?.Any() == true;
+    }
+
+    private async ValueTask OnVoiceStateUpdateAsync(VoiceState voiceState)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        if (voiceState.GuildId != _session.GuildId)
+        {
+            return;
+        }
+
+        await Task.Delay(_options.Value.GracePeriodAfterEmpty);
+
+        if (!await HasActiveMembersAsync())
+        {
+            _logger.LogInformation("Channel is empty, stopping recording.");
+            await StopRecordingAsync("channel empty", CancellationToken.None);
+        }
     }
 
     private string EnsureOutputDirectory()
