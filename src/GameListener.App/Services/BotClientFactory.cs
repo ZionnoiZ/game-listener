@@ -1,7 +1,5 @@
-using DSharpPlus;
-using DSharpPlus.VoiceNext;
 using GameListener.App.Options;
-using Microsoft.Extensions.Logging;
+using NetCord.Gateway;
 using Microsoft.Extensions.Options;
 
 namespace GameListener.App.Services;
@@ -9,15 +7,13 @@ namespace GameListener.App.Services;
 public sealed class BotClientFactory
 {
     private readonly IOptions<DiscordOptions> _options;
-    private readonly ILoggerFactory _loggerFactory;
 
-    public BotClientFactory(IOptions<DiscordOptions> options, ILoggerFactory loggerFactory)
+    public BotClientFactory(IOptions<DiscordOptions> options)
     {
         _options = options;
-        _loggerFactory = loggerFactory;
     }
 
-    public DiscordClient Create()
+    public GatewayClient Create()
     {
         var settings = _options.Value;
         if (string.IsNullOrWhiteSpace(settings.Token))
@@ -25,19 +21,11 @@ public sealed class BotClientFactory
             throw new InvalidOperationException("Discord bot token is missing. Provide Discord:Token in configuration.");
         }
 
-        var discord = new DiscordClient(new DiscordConfiguration
+        var client = new GatewayClient(settings.Token, new GatewayClientConfiguration
         {
-            Token = settings.Token,
-            TokenType = TokenType.Bot,
-            LoggerFactory = _loggerFactory,
-            Intents = DiscordIntents.All | DiscordIntents.MessageContents
+            Intents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent | GatewayIntents.GuildVoiceStates
         });
 
-        discord.UseVoiceNext(new VoiceNextConfiguration
-        {
-            EnableIncoming = true
-        });
-
-        return discord;
+        return client;
     }
 }
