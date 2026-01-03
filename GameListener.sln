@@ -4,6 +4,8 @@ VisualStudioVersion = 17.0.31912.275
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameListener.App", "src/GameListener.App/GameListener.App.csproj", "{BF7F5A1B-947F-4BC8-8318-578625D50BA4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameListener.Transcription", "src/GameListener.Transcription/GameListener.Transcription.csproj", "{DE657BA4-1996-4A21-A3F4-01E1401CB3F8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -14,6 +16,10 @@ Global
 		{BF7F5A1B-947F-4BC8-8318-578625D50BA4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BF7F5A1B-947F-4BC8-8318-578625D50BA4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BF7F5A1B-947F-4BC8-8318-578625D50BA4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DE657BA4-1996-4A21-A3F4-01E1401CB3F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DE657BA4-1996-4A21-A3F4-01E1401CB3F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DE657BA4-1996-4A21-A3F4-01E1401CB3F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DE657BA4-1996-4A21-A3F4-01E1401CB3F8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
