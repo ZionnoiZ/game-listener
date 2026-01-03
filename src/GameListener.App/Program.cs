@@ -3,6 +3,7 @@ using GameListener.App.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using NetCord.Gateway;
 using NetCord.Hosting.Gateway;
 using NetCord.Hosting.Services;
@@ -20,10 +21,12 @@ var host = Host.CreateDefaultBuilder(args)
     {
         services.Configure<DiscordOptions>(context.Configuration.GetSection("Discord"));
         services.AddSingleton<RecordingManager>();
-        services.AddHostedService<BotHostedService>(); 
+        services.AddHostedService<RecordingCleanupService>();
         services
-            .AddDiscordGateway(options =>
+            .AddDiscordGateway((provider, options) =>
             {
+                var discordOptions = provider.GetRequiredService<IOptions<DiscordOptions>>().Value;
+                options.Token = discordOptions.Token;
                 options.Intents = GatewayIntents.All;
             })
             .AddGatewayHandlers(typeof(Program).Assembly)
