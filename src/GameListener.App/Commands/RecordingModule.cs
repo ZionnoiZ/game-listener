@@ -34,14 +34,13 @@ public sealed class RecordingModule : CommandModule<CommandContext>
             return;
         }
 
-        var guildMessage = message as IGuildMessage;
-        if (guildMessage is null)
-        {
-            await ReplyAsync(message, "You must run this command in a guild.");
-            return;
-        }
+        //if (message is not IGuildMessage guildMessage)
+        //{
+        //    await ReplyAsync(message, "You must run this command in a guild.");
+        //    return;
+        //}
 
-        var voiceState = await GetVoiceStateAsync(message.AuthorId, guildMessage.GuildId);
+        var voiceState = await GetVoiceStateAsync(message.Author.Id, message.GuildId.Value);
         if (voiceState is null || voiceState.ChannelId is null)
         {
             await ReplyAsync(message, "Join a voice channel before calling record.");
@@ -50,7 +49,7 @@ public sealed class RecordingModule : CommandModule<CommandContext>
 
         try
         {
-            await _recordingManager.StartRecordingAsync(guildMessage.GuildId, voiceState.ChannelId.Value, message.Author?.Username ?? "unknown");
+            await _recordingManager.StartRecordingAsync(message.GuildId.Value, voiceState.ChannelId.Value, message.Author?.Username ?? "unknown");
             await AddReactionAsync(message, "🔴");
         }
         catch (Exception ex)
@@ -70,12 +69,12 @@ public sealed class RecordingModule : CommandModule<CommandContext>
     private async Task<VoiceState?> GetVoiceStateAsync(ulong userId, ulong guildId)
     {
         var guild = await _client.Rest.GetGuildAsync(guildId);
-        return guild?.VoiceStates?.FirstOrDefault(vs => vs.UserId == userId);
+        return await guild.GetUserVoiceStateAsync(userId);
     }
 
     private Task ReplyAsync(Message message, string content)
     {
-        return _client.Rest.CreateMessageAsync(message.ChannelId, new MessageProperties
+        return _client.Rest.SendMessageAsync(message.ChannelId, new MessageProperties
         {
             Content = content
         });
@@ -83,6 +82,6 @@ public sealed class RecordingModule : CommandModule<CommandContext>
 
     private Task AddReactionAsync(Message message, string emoji)
     {
-        return _client.Rest.AddReactionAsync(message.ChannelId, message.Id, emoji);
+        return _client.Rest.AddMessageReactionAsync(message.ChannelId, message.Id, emoji);
     }
 }

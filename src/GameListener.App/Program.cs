@@ -21,16 +21,19 @@ var host = Host.CreateDefaultBuilder(args)
     {
         services.Configure<DiscordOptions>(context.Configuration.GetSection("Discord"));
         services.AddSingleton<RecordingManager>();
-        services.AddHostedService<RecordingCleanupService>();
+        //services.AddHostedService<RecordingCleanupService>();
         services
-            .AddDiscordGateway((provider, options) =>
+            .AddDiscordGateway((options, provider) =>
             {
                 var discordOptions = provider.GetRequiredService<IOptions<DiscordOptions>>().Value;
                 options.Token = discordOptions.Token;
                 options.Intents = GatewayIntents.All;
             })
             .AddGatewayHandlers(typeof(Program).Assembly)
-            .AddCommands();
+            .AddCommands((options, provider) => {
+                var discordOptions = provider.GetRequiredService<IOptions<DiscordOptions>>().Value;
+                options.Prefix = discordOptions.Prefix;
+            });
     })
     .Build();
 
