@@ -7,6 +7,7 @@ using NetCord.Gateway.Voice;
 using NetCord.Logging;
 using NetCord.Rest;
 using System.Linq;
+using System.Threading.Channels;
 using System.Text.Json;
 
 namespace GameListener.App.Services;
@@ -234,9 +235,10 @@ public sealed class RecordingManager
 
         private string BuildSessionFilePath(string directory, string channelName, string requestedBy)
         {
-            var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd");
+            var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd_HHmmss");
+            var sessionId = Guid.NewGuid().ToString("N")[..8];
             var safeName = string.Join("_", channelName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-            var fileName = $"session_{timestamp}_{safeName}_by_{SanitizeName(requestedBy)}.jsonl";
+            var fileName = $"session_{timestamp}_{safeName}_by_{SanitizeName(requestedBy)}_{sessionId}.jsonl";
             return Path.Combine(directory, fileName);
         }
 
@@ -250,8 +252,10 @@ public sealed class RecordingManager
     private sealed class SessionWriter : IAsyncDisposable
     {
         private readonly string _filePath;
-        private readonly StreamWriter _writer;
         private readonly ILogger _logger;
+        private readonly StreamWriter _writer;
+        private readonly Channel<string> _writeChannel;
+        private readonly Task _processingTask;
         private readonly JsonSerializerOptions _serializerOptions = new()
         {
             WriteIndented = false
@@ -261,10 +265,16 @@ public sealed class RecordingManager
         {
             _filePath = filePath;
             _logger = logger;
-            _writer = new StreamWriter(File.Open(filePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read))
+            _writer = new StreamWriter(File.Open(filePath, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
             {
                 AutoFlush = true
             };
+            _writeChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false
+            });
+            _processingTask = Task.Run(ProcessQueueAsync);
         }
 
         public async Task WriteHeaderAsync(GatewayClient client, ulong guildId, ulong channelId, string channelName)
@@ -311,16 +321,38 @@ public sealed class RecordingManager
         private async Task WriteJsonAsync(object payload)
         {
             var line = JsonSerializer.Serialize(payload, _serializerOptions);
-            await _writer.WriteLineAsync(line);
-            await _writer.FlushAsync();
-            _logger.LogDebug("Wrote packet to {File}", _filePath);
+            if (!_writeChannel.Writer.TryWrite(line))
+            {
+                await _writeChannel.Writer.WriteAsync(line);
+            }
         }
 
         public async ValueTask DisposeAsync()
         {
             await WriteJsonAsync(new { type = "session-end", endedAt = DateTimeOffset.UtcNow });
+            _writeChannel.Writer.TryComplete();
+            try
+            {
+                await _processingTask;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to flush recording session to {FilePath}", _filePath);
+                throw;
+            }
+
             await _writer.DisposeAsync();
             _logger.LogInformation("Session written to {FilePath}", _filePath);
+        }
+
+        private async Task ProcessQueueAsync()
+        {
+            await foreach (var line in _writeChannel.Reader.ReadAllAsync())
+            {
+                await _writer.WriteLineAsync(line);
+                await _writer.FlushAsync();
+                _logger.LogDebug("Wrote packet to {File}", _filePath);
+            }
         }
     }
 }
