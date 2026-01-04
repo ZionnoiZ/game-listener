@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Concentus" Version="2.2.2" />
+    <PackageReference Include="CSCore" Version="1.2.1.2" />
+    <PackageReference Include="CSCore.Opus" Version="1.0.1.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="9.0.11" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.11" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.11" />

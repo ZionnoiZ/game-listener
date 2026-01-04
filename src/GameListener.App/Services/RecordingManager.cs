@@ -207,12 +207,29 @@ public sealed class RecordingManager
                 // 3) Copy frame NOW (args.Frame is a span on a ref struct) :contentReference[oaicite:3]{index=3}
                 var frameCopy = args.Frame.ToArray();
 
+                //if (!OpusPacketProbe.TryGetSamples(args.Frame, 48000, out var samples))
+                //{
+                //    // Valid Opus packet, samples per channel known
+                //    // samples should be one of: 120, 240, 480, 960, 1920, 2880 (commonly 960)
+                //    _logger.LogError("Incorrect opus package");
+                //}
+
+                // 1) Decode Opus -> PCM using NetCord:
+                // OpusDecodeStream writes decoded PCM into the 'next' stream. :contentReference[oaicite:2]{index=2}
+                using var pcmOut = new MemoryStream();
+                using (var decoder = new OpusDecodeStream(pcmOut, PcmFormat.Short, VoiceChannels.Mono))
+                {
+                    decoder.Write(frameCopy); // feed ONE Opus packet :contentReference[oaicite:3]{index=3}
+                    decoder.Flush();
+                }
+
+                byte[] pcmBytes = pcmOut.ToArray();
                 var packet = new
                 {
                     UserId = userId,
                     UserName = userName,
                     ReceivedAtUtc = DateTimeOffset.UtcNow,
-                    Frame = frameCopy
+                    Frame = pcmBytes
                 };
 
                 return _writer.WriteEntryAsync(packet);

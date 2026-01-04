@@ -87,6 +87,8 @@ public sealed class SessionTranscriptionService
     private async Task ProcessFileAsync(string inputFile, string outputFile, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Processing session file {File}.", inputFile);
+        var talks = new Dictionary<ulong, List<byte>>();
+        var fileName = string.Empty;
 
         await using var input = File.OpenRead(inputFile);
         using var reader = new StreamReader(input);
@@ -108,29 +110,41 @@ public sealed class SessionTranscriptionService
 
             if (!string.Equals(entry.Type, "audio", StringComparison.OrdinalIgnoreCase))
             {
-                await output.WriteLineAsync(line);
+                //await output.WriteLineAsync(line);
                 continue;
             }
 
             if (string.IsNullOrWhiteSpace(entry.AudioBase64))
             {
-                await output.WriteLineAsync(line);
+                //await output.WriteLineAsync(line);
                 continue;
             }
 
             var audioBytes = Convert.FromBase64String(entry.AudioBase64);
+            if (!talks.ContainsKey(entry.UserId.Value))
+            {
+                talks.Add(entry.UserId.Value, []);
+            }
+            talks[entry.UserId.Value].AddRange(audioBytes);
+            fileName = inputFile;
+        }
+
+        foreach(var user in talks.Keys)
+        {
+
             var request = new AudioTranscriptionRequest
             {
-                AudioBytes = audioBytes
+                AudioBytes = talks[user].ToArray(),
+                FileName = inputFile
             };
 
             var transcription = await _transcriptionClient.TranscribeAsync(request, cancellationToken);
-            entry.Text = transcription.Text;
-            entry.Language = transcription.Language;
-            entry.AudioBase64 = null;
+            //entry.Text = transcription.Text;
+            //entry.Language = transcription.Language;
+            //entry.AudioBase64 = null;
 
-            var updatedLine = JsonSerializer.Serialize(entry, _serializerOptions);
-            await output.WriteLineAsync(updatedLine);
+            //var updatedLine = JsonSerializer.Serialize(entry, _serializerOptions);
+            await output.WriteLineAsync(transcription.Text);
         }
     }
 }

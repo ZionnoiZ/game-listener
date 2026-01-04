@@ -9,6 +9,7 @@ using NetCord.Hosting.Gateway;
 using NetCord.Hosting.Services;
 using NetCord.Hosting.Services.Commands;
 using NetCord.Services;
+using System.Runtime.InteropServices;
 
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureAppConfiguration((context, config) =>
@@ -39,5 +40,19 @@ var host = Host.CreateDefaultBuilder(args)
 
 // Add commands from modules
 host.AddModules(typeof(Program).Assembly);
+
+var dllPath = Path.Combine(AppContext.BaseDirectory, "opus.dll");
+Console.WriteLine($"Trying to load: {dllPath}");
+Console.WriteLine(File.Exists(dllPath) ? "opus.dll exists" : "opus.dll MISSING");
+
+try
+{
+    NativeLibrary.Load(dllPath);
+    Console.WriteLine("Loaded opus.dll OK");
+}
+catch (Exception ex)
+{
+    Console.WriteLine("Load failed: " + ex);
+}
 
 await host.RunAsync();
