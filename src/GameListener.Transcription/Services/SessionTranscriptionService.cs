@@ -89,16 +89,16 @@ public sealed class SessionTranscriptionService
         _logger.LogInformation("Processing session file {File}.", inputFile);
 
         await using var input = File.OpenRead(inputFile);
-        await using var reader = new StreamReader(input);
+        using var reader = new StreamReader(input);
 
-        await using var output = new StreamWriter(File.Open(outputFile, FileMode.Create, FileAccess.Write, FileShare.Read))
+        await using var output = new StreamWriter(File.Open(outputFile, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read))
         {
             AutoFlush = true
         };
 
         while (!reader.EndOfStream)
         {
-            var line = await reader.ReadLineAsync();
+            var line = await reader.ReadLineAsync(cancellationToken);
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 

@@ -18,3 +18,4 @@ obj/
 # Output
 sessions/
 /src/GameListener.App/appsettings.Development.json
+/src/GameListener.Transcription/appsettings.Development.json

@@ -2,6 +2,7 @@ using GameListener.Transcription.Models;
 using GameListener.Transcription.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Text;
 using Whisper.net;
 using Whisper.net.Ggml;
 
@@ -12,6 +13,7 @@ public sealed class WhisperNetTranscriptionClient : IAudioTranscriptionClient, I
     private readonly ILogger<WhisperNetTranscriptionClient> _logger;
     private readonly TranscriptionOptions _options;
     private WhisperProcessor? _processor;
+    private WhisperFactory? _factory;
 
     public WhisperNetTranscriptionClient(
         ILogger<WhisperNetTranscriptionClient> logger,
@@ -24,14 +26,21 @@ public sealed class WhisperNetTranscriptionClient : IAudioTranscriptionClient, I
     public async Task<AudioTextResult> TranscribeAsync(AudioTranscriptionRequest request, CancellationToken cancellationToken)
     {
         await EnsureProcessorAsync(cancellationToken);
+        using var stream = new MemoryStream(request.AudioBytes);
+        var result = _processor!.ProcessAsync(stream, cancellationToken: cancellationToken);
+        var resultText = new StringBuilder();
+        var language = string.Empty;
 
-        using var result = await _processor!.ProcessAsync(request.AudioBytes, cancellationToken: cancellationToken);
-        var text = await result.GetTextAsync();
-        var language = result.Language;
+        await foreach (SegmentData item in result)
+        {
+            resultText.Append(item.Text);
+            language = item.Language;
+            // process text
+        }
 
         return new AudioTextResult
         {
-            Text = text ?? string.Empty,
+            Text = resultText.ToString() ?? string.Empty,
             Language = language
         };
     }
@@ -41,16 +50,15 @@ public sealed class WhisperNetTranscriptionClient : IAudioTranscriptionClient, I
         if (_processor is not null)
             return;
 
-        var modelBytes = await LoadModelBytesAsync(cancellationToken);
-        using var modelStream = new MemoryStream(modelBytes, writable: false);
-        _processor = new WhisperFactory(modelStream).CreateBuilder()
+        await LoadModelAsync(cancellationToken);
+        _processor = _factory!.CreateBuilder()
             .WithLanguage("auto")
             .Build();
 
         _logger.LogInformation("Loaded Whisper model for transcription.");
     }
 
-    private async Task<byte[]> LoadModelBytesAsync(CancellationToken cancellationToken)
+    private async Task LoadModelAsync(CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(_options.ModelPath))
         {
@@ -61,7 +69,7 @@ public sealed class WhisperNetTranscriptionClient : IAudioTranscriptionClient, I
             }
 
             _logger.LogInformation("Using local Whisper model: {Path}", resolvedPath);
-            return await File.ReadAllBytesAsync(resolvedPath, cancellationToken);
+            _factory = WhisperFactory.FromPath(resolvedPath);
         }
 
         var modelType = ParseModelSize(_options.ModelSize);
@@ -75,7 +83,7 @@ public sealed class WhisperNetTranscriptionClient : IAudioTranscriptionClient, I
         if (!File.Exists(modelPath))
         {
             _logger.LogInformation("Downloading Whisper model {Model} to {Path}...", modelType, modelPath);
-            await using var source = await WhisperGgmlDownloader.GetGgmlModelAsync(modelType, cancellationToken: cancellationToken);
+            await using var source = await WhisperGgmlDownloader.Default.GetGgmlModelAsync(modelType, cancellationToken: cancellationToken);
             await using var destination = File.Create(modelPath);
             await source.CopyToAsync(destination, cancellationToken);
             _logger.LogInformation("Downloaded Whisper model to {Path}", modelPath);
@@ -85,7 +93,7 @@ public sealed class WhisperNetTranscriptionClient : IAudioTranscriptionClient, I
             _logger.LogInformation("Using cached Whisper model at {Path}", modelPath);
         }
 
-        return await File.ReadAllBytesAsync(modelPath, cancellationToken);
+        _factory = WhisperFactory.FromPath(modelPath);
     }
 
     private static GgmlType ParseModelSize(string? value)
@@ -105,7 +113,7 @@ public sealed class WhisperNetTranscriptionClient : IAudioTranscriptionClient, I
             "largev2" or "largev2en" => GgmlType.LargeV2,
             "largev3" or "largev3en" => GgmlType.LargeV3,
             "largev3turbo" or "largev3turboen" => GgmlType.LargeV3Turbo,
-            "largev4" or "largev4en" => GgmlType.LargeV4,
+            //"largev4" or "largev4en" => GgmlType.LargeV4,
             _ => GgmlType.BaseEn
         };
     }
@@ -124,7 +132,7 @@ public sealed class WhisperNetTranscriptionClient : IAudioTranscriptionClient, I
         GgmlType.LargeV2 => "ggml-large-v2.bin",
         GgmlType.LargeV3 => "ggml-large-v3.bin",
         GgmlType.LargeV3Turbo => "ggml-large-v3-turbo.bin",
-        GgmlType.LargeV4 => "ggml-large-v4.bin",
+        //GgmlType.LargeV4 => "ggml-large-v4.bin",
         _ => "ggml-base.en.bin"
     };
 
