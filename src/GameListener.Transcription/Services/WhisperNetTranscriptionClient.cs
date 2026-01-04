@@ -380,7 +380,7 @@ public sealed class WhisperNetTranscriptionClient : IAudioTranscriptionClient, I
         await LoadModelAsync(cancellationToken);
         _processor = _factory!.CreateBuilder()
             .WithTemperature(0)
-            .WithLanguage("uk")
+            .WithLanguage("ru")
             .WithNoSpeechThreshold(0.25f)
             .WithLogProbThreshold(-1.2f)
             .WithBeamSearchSamplingStrategy()
